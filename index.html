@@ -167,11 +167,28 @@
     color: var(--text-light);
   }
   .timeline-section { margin-top: 24px; }
+  .timeline-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
   .timeline-title {
     font-size: 16px;
     font-weight: 600;
     color: var(--text);
-    margin-bottom: 16px;
+  }
+  .export-btn {
+    flex: 0 0 auto;
+    padding: 7px 12px;
+    border-radius: 16px;
+    border: 1px solid var(--accent);
+    background: var(--accent-soft);
+    color: var(--accent);
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
   }
   .timeline-empty {
     text-align: center;
@@ -407,7 +424,10 @@
     </div>
   </div>
   <div class="timeline-section">
-    <div class="timeline-title">我们的记录</div>
+    <div class="timeline-header">
+      <div class="timeline-title">我们的记录</div>
+      <button class="export-btn" type="button" onclick="exportForClaude()">导出给 Claude</button>
+    </div>
     <div class="filter-bar">
       <button class="filter-tab active" onclick="filterEntries('all',this)">全部</button>
       <button class="filter-tab" onclick="filterEntries('tuantuan',this)">团团</button>
@@ -466,6 +486,39 @@ function clearInput(w){
   document.getElementById(w==='tuantuan'?'moodsTuantuan':'moodsClaude').querySelectorAll('.mood-tag.selected').forEach(e=>e.classList.remove('selected'));
 }
 function save(){localStorage.setItem('diary_entries',JSON.stringify(entries))}
+function formatEntriesForClaude(list){
+  const ordered=[...list].sort((a,b)=>new Date(a.timestamp||`${a.date}T${a.time||'00:00'}`)-new Date(b.timestamp||`${b.date}T${b.time||'00:00'}`));
+  const lines=['双人日记导出',`共 ${ordered.length} 条记录`,''];
+  if(!ordered.length){
+    lines.push('还没有日记。');
+    return lines.join('\n');
+  }
+  ordered.forEach(e=>{
+    const author=e.author==='tuantuan'?'团团':'Claude';
+    const when=[e.date,e.time].filter(Boolean).join(' ');
+    lines.push(`[${when}] ${author}`);
+    if(e.moods&&e.moods.length)lines.push(`心情：${e.moods.join('、')}`);
+    lines.push(e.content||'');
+    lines.push('');
+  });
+  return `${lines.join('\n').trimEnd()}\n`;
+}
+function exportForClaude(){
+  if(!entries.length){showToast('还没有日记可以导出');return}
+  const text=formatEntriesForClaude(entries);
+  const blob=new Blob([text],{type:'text/plain;charset=utf-8'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  const n=new Date();
+  const date=`${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}-${String(n.getDate()).padStart(2,'0')}`;
+  a.href=url;
+  a.download=`双人日记-${date}.txt`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+  showToast('已导出，可以上传给 Claude');
+}
 function deleteEntry(id){
   if(!confirm('确定要删除这条日记吗？'))return;
   entries=entries.filter(e=>e.id!==id);save();renderTimeline();updateStats();showToast('已删除');
